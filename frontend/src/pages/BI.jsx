@@ -27,10 +27,26 @@ const BLUE = '#2b5f8f';
 const BLUE_LIGHT = 'rgba(59, 130, 196, 0.25)';
 const BLUE_DARK = '#1e3a5f';
 
+const UNIT_TYPE_OPTIONS = [
+  { value: '', label: 'Global (cabinas y cabañas)' },
+  { value: 'cabina', label: 'Solo cabinas' },
+  { value: 'cabana', label: 'Solo cabañas' },
+];
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: '', label: 'Todos los metodos' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'sinpe', label: 'Sinpe' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+  { value: 'transferencia', label: 'Transferencia' },
+];
+
 export default function BI() {
   const [from, setFrom] = useState(todayMinus(30));
   const [to, setTo] = useState(todayMinus(0));
   const [groupBy, setGroupBy] = useState('day');
+  const [unitType, setUnitType] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [series, setSeries] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,16 +54,25 @@ export default function BI() {
 
   useEffect(() => {
     load();
-  }, [from, to, groupBy]);
+  }, [from, to, groupBy, unitType, paymentMethod]);
+
+  function buildFilterParams() {
+    const params = { from, to };
+    if (unitType) params.unit_type = unitType;
+    if (paymentMethod) params.payment_method = paymentMethod;
+    return params;
+  }
 
   async function handleDownloadReport() {
     setDownloading(true);
     try {
-      const response = await client.get('/bi/report', { params: { from, to }, responseType: 'blob' });
+      const params = buildFilterParams();
+      const response = await client.get('/bi/report', { params, responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
+      const suffix = `${unitType ? `_${unitType}` : ''}${paymentMethod ? `_${paymentMethod}` : ''}`;
       link.href = url;
-      link.setAttribute('download', `reservas_${from}_a_${to}.pdf`);
+      link.setAttribute('download', `reservas_${from}_a_${to}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -60,9 +85,11 @@ export default function BI() {
   async function load() {
     setLoading(true);
     try {
+      const params = buildFilterParams();
+      const paramsWithGroup = { ...params, groupBy };
       const [s1, s2] = await Promise.all([
-        client.get('/bi/timeseries', { params: { from, to, groupBy } }),
-        client.get('/bi/summary', { params: { from, to } }),
+        client.get('/bi/timeseries', { params: paramsWithGroup }),
+        client.get('/bi/summary', { params }),
       ]);
       setSeries(s1.data);
       setSummary(s2.data);
@@ -136,6 +163,22 @@ export default function BI() {
 
       <div className="toolbar">
         <div>
+          <label>Ver</label>
+          <select value={unitType} onChange={(e) => setUnitType(e.target.value)}>
+            {UNIT_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label>Metodo de pago</label>
+          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+            {PAYMENT_METHOD_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label>Desde</label>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         </div>
@@ -194,7 +237,7 @@ export default function BI() {
           </div>
           {cabinData && (
             <div className="card" style={{ gridColumn: '1 / -1' }}>
-              <h3 style={{ marginTop: 0, color: 'var(--color-primary-dark)' }}>Reservas por cabina (top 10)</h3>
+              <h3 style={{ marginTop: 0, color: 'var(--color-primary-dark)' }}>Reservas por unidad (top 10)</h3>
               <Bar data={cabinData} />
             </div>
           )}

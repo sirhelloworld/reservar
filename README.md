@@ -75,3 +75,33 @@ Inicia sesión con el correo y contraseña del administrador creados por `npm ru
 - Una reserva ocupa la cabina desde `check_in` (inclusive) hasta `check_out` (exclusivo) — solo por noche.
 - La base de datos evita solapamientos: no se pueden crear dos reservas confirmadas en la misma cabina con fechas que se crucen.
 - Al eliminar una cabina con historial de reservas, esta se desactiva en lugar de borrarse (para no perder el histórico).
+
+## Despliegue en Supabase + Vercel
+
+La base de datos vive en Supabase y la app completa (frontend + API) en un solo proyecto de Vercel:
+el frontend se sirve como sitio estático (`frontend/dist`) y Express corre como función serverless en `api/index.js`.
+
+### 1. Supabase (base de datos)
+
+1. Crea un proyecto en [supabase.com](https://supabase.com).
+2. En **Connect → Connection string**, copia la URL del **Transaction pooler** (puerto `6543`) y reemplaza `[YOUR-PASSWORD]`.
+3. Desde tu máquina, crea el esquema y los datos iniciales apuntando a Supabase (en `backend/.env` pon `DATABASE_URL=...`):
+
+```bash
+cd backend
+npm run migrate
+npm run seed
+```
+
+El esquema activa RLS en todas las tablas para que no sean accesibles desde la API pública de Supabase; el backend no se ve afectado.
+
+### 2. Vercel (app)
+
+1. Importa el repositorio en [vercel.com/new](https://vercel.com/new) dejando el **Root Directory** en la raíz (la configuración está en `vercel.json`).
+2. En **Settings → Environment Variables** define: `DATABASE_URL`, `JWT_SECRET`, `CRON_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_TO`.
+3. Despliega.
+
+### Correo diario en Vercel
+
+En Vercel no corre `node-cron`; el envío lo dispara **Vercel Cron** (`vercel.json`) llamando a `/api/cron/daily-summary`.
+El horario está en UTC: `0 13 * * *` = 7:00am en Costa Rica.

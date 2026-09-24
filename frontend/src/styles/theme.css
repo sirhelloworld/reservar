@@ -20,8 +20,12 @@
 
   --color-occupied: #c0392b;
   --color-occupied-dark: #922b21;
+  --color-occupied-dirty: #d9822b;
+  --color-occupied-dirty-dark: #a85f1c;
   --color-needs-cleaning: #e8c547;
   --color-needs-cleaning-dark: #b7960f;
+  --color-reserved: #2b5f8f;
+  --color-reserved-dark: #1e3a5f;
   --color-available: #cbd5e1;
 
   --radius: 10px;
@@ -244,10 +248,22 @@ tbody tr:hover { background: var(--color-surface-alt); }
   border-color: var(--color-occupied-dark);
 }
 
+.cabin-tile.occupied_needs_cleaning {
+  background: var(--color-occupied-dirty);
+  color: #fff;
+  border-color: var(--color-occupied-dirty-dark);
+}
+
 .cabin-tile.needs_cleaning {
   background: var(--color-needs-cleaning);
   color: #4a3b06;
   border-color: var(--color-needs-cleaning-dark);
+}
+
+.cabin-tile.reserved {
+  background: var(--color-reserved);
+  color: #fff;
+  border-color: var(--color-reserved-dark);
 }
 
 .cabin-tile .name { font-weight: 700; font-size: 14px; }

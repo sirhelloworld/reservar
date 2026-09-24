@@ -3,7 +3,7 @@ import client from '../api/client';
 import ReservationModal from '../components/ReservationModal.jsx';
 import { formatCurrency } from '../utils/format';
 
-const PAYMENT_LABELS = { efectivo: 'Efectivo', sinpe: 'Sinpe', tarjeta: 'Tarjeta' };
+const PAYMENT_LABELS = { efectivo: 'Efectivo', sinpe: 'Sinpe', tarjeta: 'Tarjeta', transferencia: 'Transferencia' };
 const PRICE_TYPE_LABELS = { normal: 'Normal', empresarial: 'Empresarial' };
 
 function isCheckedOut(r) {
@@ -140,19 +140,17 @@ export default function Reservations() {
                   <td>{PRICE_TYPE_LABELS[r.price_type] || r.price_type}</td>
                   <td>{PAYMENT_LABELS[r.payment_method] || r.payment_method}</td>
                   <td>
-                    {isCheckedOut(r) ? (
+                    {r.status === 'confirmed' ? (
                       <select
                         value={r.housekeeping_status}
                         onChange={(e) => handleHousekeepingChange(r, e.target.value)}
                         className={r.housekeeping_status === 'necesita_limpieza' ? 'housekeeping-select needs-cleaning' : 'housekeeping-select'}
                       >
                         <option value="necesita_limpieza">Necesita limpieza</option>
-                        <option value="lista">Lista para alquilar</option>
+                        <option value="lista">{isCheckedOut(r) ? 'Lista para alquilar' : 'Limpia'}</option>
                       </select>
                     ) : (
-                      <span style={{ color: 'var(--color-text-soft)', fontSize: 12 }}>
-                        {r.status === 'confirmed' ? 'Ocupada' : '—'}
-                      </span>
+                      <span style={{ color: 'var(--color-text-soft)', fontSize: 12 }}>—</span>
                     )}
                   </td>
                   <td>

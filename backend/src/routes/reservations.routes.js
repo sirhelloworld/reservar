@@ -79,7 +79,7 @@ router.post('/:id/checkout', async (req, res) => {
   }
 });
 
-const PAYMENT_METHODS = ['efectivo', 'sinpe', 'tarjeta'];
+const PAYMENT_METHODS = ['efectivo', 'sinpe', 'tarjeta', 'transferencia'];
 const HOUSEKEEPING_STATUSES = ['lista', 'necesita_limpieza'];
 const PRICE_TYPES = ['normal', 'empresarial'];
 
@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
   const guestsCount = guests || 1;
   const paymentMethod = payment_method || 'efectivo';
   if (!PAYMENT_METHODS.includes(paymentMethod)) {
-    return res.status(400).json({ error: 'El metodo de pago debe ser efectivo, sinpe o tarjeta' });
+    return res.status(400).json({ error: 'El metodo de pago debe ser efectivo, sinpe, tarjeta o transferencia' });
   }
   const housekeepingStatus = housekeeping_status || 'necesita_limpieza';
   if (!HOUSEKEEPING_STATUSES.includes(housekeepingStatus)) {
@@ -193,7 +193,7 @@ router.put('/:id', async (req, res) => {
   } = req.body;
 
   if (payment_method && !PAYMENT_METHODS.includes(payment_method)) {
-    return res.status(400).json({ error: 'El metodo de pago debe ser efectivo, sinpe o tarjeta' });
+    return res.status(400).json({ error: 'El metodo de pago debe ser efectivo, sinpe, tarjeta o transferencia' });
   }
   if (housekeeping_status && !HOUSEKEEPING_STATUSES.includes(housekeeping_status)) {
     return res.status(400).json({ error: 'El estado de limpieza debe ser lista o necesita_limpieza' });
@@ -205,6 +205,14 @@ router.put('/:id', async (req, res) => {
   try {
     const { rows: current } = await pool.query('SELECT cabin_id, guests FROM reservations WHERE id = $1', [id]);
     if (!current[0]) return res.status(404).json({ error: 'Reserva no encontrada' });
+
+    // La cabina/cabana asignada es inmutable una vez creada la reserva: evita moverla por error
+    // o por una llamada directa a la API que se salte el bloqueo de la interfaz.
+    if (cabin_id && String(cabin_id) !== String(current[0].cabin_id)) {
+      return res.status(400).json({
+        error: 'No se puede cambiar la cabina/cabana de una reserva ya creada. Cancela esta reserva y crea una nueva si necesitas moverla.',
+      });
+    }
 
     const finalCabinId = cabin_id || current[0].cabin_id;
     const finalGuests = guests || current[0].guests;

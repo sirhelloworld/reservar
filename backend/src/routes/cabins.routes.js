@@ -5,10 +5,20 @@ const { authRequired } = require('../middleware/auth');
 const router = express.Router();
 router.use(authRequired);
 
-// Lista todas las cabinas con su estado (ocupada/disponible) en una fecha dada (por defecto hoy)
+const UNIT_TYPES = ['cabina', 'cabana'];
+
+// Lista todas las cabinas/cabanas con su estado (ocupada/disponible) en una fecha dada (por defecto hoy).
+// Puede filtrarse por unit_type=cabina|cabana.
 router.get('/', async (req, res) => {
   const date = req.query.date || new Date().toISOString().slice(0, 10);
+  const { unit_type } = req.query;
   try {
+    const params = [date];
+    let unitTypeClause = '';
+    if (unit_type && UNIT_TYPES.includes(unit_type)) {
+      params.push(unit_type);
+      unitTypeClause = `WHERE c.unit_type = $${params.length}`;
+    }
     const { rows } = await pool.query(
       `SELECT c.*,
               r.id AS active_reservation_id,
@@ -17,8 +27,12 @@ router.get('/', async (req, res) => {
               r.total_price AS active_total_price,
               r.check_in AS active_check_in,
               r.check_out AS active_check_out,
+              r.housekeeping_status AS active_housekeeping_status,
               lastres.id AS last_reservation_id,
-              lastres.housekeeping_status AS last_housekeeping_status
+              lastres.housekeeping_status AS last_housekeeping_status,
+              nextres.id AS next_reservation_id,
+              nextres.client_name AS next_client_name,
+              nextres.check_in AS next_check_in
        FROM cabins c
        LEFT JOIN reservations r
          ON r.cabin_id = c.id
@@ -35,15 +49,28 @@ router.get('/', async (req, res) => {
          ORDER BY r2.checked_out_at DESC
          LIMIT 1
        ) lastres ON true
+       LEFT JOIN LATERAL (
+         SELECT r3.id, r3.client_name, r3.check_in
+         FROM reservations r3
+         WHERE r3.cabin_id = c.id
+           AND r3.status = 'confirmed'
+           AND r3.checked_out_at IS NULL
+           AND r3.check_in > $1::date
+         ORDER BY r3.check_in ASC
+         LIMIT 1
+       ) nextres ON true
+       ${unitTypeClause}
        ORDER BY c.name ASC`,
-      [date]
+      params
     );
     const data = rows.map((c) => {
       let status = 'available';
       if (c.active_reservation_id) {
-        status = 'occupied';
+        status = c.active_housekeeping_status === 'necesita_limpieza' ? 'occupied_needs_cleaning' : 'occupied';
       } else if (c.last_housekeeping_status === 'necesita_limpieza') {
         status = 'needs_cleaning';
+      } else if (c.next_reservation_id) {
+        status = 'reserved';
       }
       return { ...c, status };
     });
@@ -57,7 +84,7 @@ router.get('/', async (req, res) => {
 // Disponibilidad de todas las cabinas para un rango de fechas (check_in/check_out),
 // util para saber cuales cabinas NO tienen espacio antes de crear una reserva.
 router.get('/availability', async (req, res) => {
-  const { from, to, exclude_reservation_id } = req.query;
+  const { from, to, exclude_reservation_id, unit_type } = req.query;
   if (!from || !to) {
     return res.status(400).json({ error: 'from y to son requeridos (YYYY-MM-DD)' });
   }
@@ -67,6 +94,11 @@ router.get('/availability', async (req, res) => {
     if (exclude_reservation_id) {
       params.push(exclude_reservation_id);
       excludeClause = `AND r.id <> $${params.length}`;
+    }
+    let unitTypeClause = '';
+    if (unit_type && UNIT_TYPES.includes(unit_type)) {
+      params.push(unit_type);
+      unitTypeClause = `AND c.unit_type = $${params.length}`;
     }
     const { rows } = await pool.query(
       `SELECT c.*,
@@ -81,6 +113,7 @@ router.get('/availability', async (req, res) => {
               ) AS occupied
        FROM cabins c
        WHERE c.active = true
+       ${unitTypeClause}
        ORDER BY c.name ASC`,
       params
     );
@@ -93,13 +126,17 @@ router.get('/availability', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name, description, capacity, price_per_night, price_per_night_company } = req.body;
+  const { name, description, capacity, price_per_night, price_per_night_company, unit_type } = req.body;
   if (!name) return res.status(400).json({ error: 'El nombre es requerido' });
+  const unitType = unit_type || 'cabina';
+  if (!UNIT_TYPES.includes(unitType)) {
+    return res.status(400).json({ error: 'El tipo de unidad debe ser cabina o cabana' });
+  }
   try {
     const { rows } = await pool.query(
-      `INSERT INTO cabins (name, description, capacity, price_per_night, price_per_night_company)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [name, description || '', capacity || 2, price_per_night || 0, price_per_night_company || 0]
+      `INSERT INTO cabins (name, description, capacity, price_per_night, price_per_night_company, unit_type)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [name, description || '', capacity || 2, price_per_night || 0, price_per_night_company || 0, unitType]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -113,7 +150,10 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, description, capacity, price_per_night, price_per_night_company, active } = req.body;
+  const { name, description, capacity, price_per_night, price_per_night_company, unit_type, active } = req.body;
+  if (unit_type && !UNIT_TYPES.includes(unit_type)) {
+    return res.status(400).json({ error: 'El tipo de unidad debe ser cabina o cabana' });
+  }
   try {
     const { rows } = await pool.query(
       `UPDATE cabins SET
@@ -122,9 +162,10 @@ router.put('/:id', async (req, res) => {
          capacity = COALESCE($3, capacity),
          price_per_night = COALESCE($4, price_per_night),
          price_per_night_company = COALESCE($5, price_per_night_company),
-         active = COALESCE($6, active)
-       WHERE id = $7 RETURNING *`,
-      [name, description, capacity, price_per_night, price_per_night_company, active, id]
+         unit_type = COALESCE($6, unit_type),
+         active = COALESCE($7, active)
+       WHERE id = $8 RETURNING *`,
+      [name, description, capacity, price_per_night, price_per_night_company, unit_type, active, id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Cabina no encontrada' });
     res.json(rows[0]);

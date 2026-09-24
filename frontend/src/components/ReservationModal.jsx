@@ -139,6 +139,17 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
     }
   }
 
+  async function handleCancelReservation() {
+    if (!confirm(`Cancelar la reserva de ${editing.client_name}?`)) return;
+    setError('');
+    try {
+      await client.put(`/reservations/${editing.id}`, { status: 'cancelled' });
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al cancelar la reserva');
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -168,7 +179,7 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
           </div>
 
           <div className="field">
-            <label>Cabina</label>
+            <label>Cabina / Cabaña</label>
             {cabinLocked ? (
               <div
                 style={{
@@ -179,7 +190,9 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
                   color: 'var(--color-text)',
                 }}
               >
-                {selectedCabin ? `${selectedCabin.name} (capacidad ${selectedCabin.capacity})` : 'Cargando...'}
+                {selectedCabin
+                  ? `${selectedCabin.name} · ${selectedCabin.unit_type === 'cabana' ? 'Cabaña' : 'Cabina'} (capacidad ${selectedCabin.capacity})`
+                  : 'Cargando...'}
               </div>
             ) : (
               <>
@@ -192,7 +205,8 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
                   <option value="">Seleccione...</option>
                   {availability.map((c) => (
                     <option key={c.id} value={c.id} disabled={c.status === 'occupied'}>
-                      {c.name} (capacidad {c.capacity}){c.status === 'occupied' ? ' - Sin espacio' : ''}
+                      {c.name} · {c.unit_type === 'cabana' ? 'Cabaña' : 'Cabina'} (capacidad {c.capacity})
+                      {c.status === 'occupied' ? ' - Sin espacio' : ''}
                     </option>
                   ))}
                 </select>
@@ -272,6 +286,8 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
                 style={{ width: '100%' }}
                 value={form.guests}
                 onChange={(e) => setForm({ ...form, guests: Number(e.target.value) })}
+                onFocus={(e) => e.target.select()}
+                onClick={(e) => e.target.select()}
               />
             </div>
             <div className="field">
@@ -286,6 +302,8 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
                   setPriceTouched(true);
                   setForm({ ...form, total_price: Number(e.target.value) });
                 }}
+                onFocus={(e) => e.target.select()}
+                onClick={(e) => e.target.select()}
               />
               {!priceTouched && selectedCabin && (
                 <div style={{ fontSize: 11, color: 'var(--color-text-soft)', marginTop: 4 }}>
@@ -325,10 +343,11 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
               <option value="efectivo">Efectivo</option>
               <option value="sinpe">Sinpe</option>
               <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
             </select>
           </div>
 
-          {isCheckedOut(editing) && (
+          {editing && editing.status === 'confirmed' && (
             <div className="field">
               <label>Estado de limpieza de la cabina</label>
               <select
@@ -338,8 +357,13 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
                 onChange={(e) => setForm({ ...form, housekeeping_status: e.target.value })}
               >
                 <option value="necesita_limpieza">Necesita limpieza</option>
-                <option value="lista">Lista para alquilar (ya se limpio)</option>
+                <option value="lista">Limpia</option>
               </select>
+              <div style={{ fontSize: 11, color: 'var(--color-text-soft)', marginTop: 4 }}>
+                {isCheckedOut(editing)
+                  ? 'La cabina ya tuvo checkout: indica si ya se limpio para poder volver a alquilarla.'
+                  : 'La cabina esta ocupada: marca si necesita limpieza durante la estadia (ej. servicio diario).'}
+              </div>
             </div>
           )}
 
@@ -358,6 +382,11 @@ export default function ReservationModal({ companies, editing, initialCabinId, i
             {editing && editing.status === 'confirmed' && !isCheckedOut(editing) && (
               <button type="button" className="btn secondary" onClick={handleCheckout}>
                 Hacer checkout
+              </button>
+            )}
+            {editing && editing.status === 'confirmed' && (
+              <button type="button" className="btn danger" onClick={handleCancelReservation}>
+                Cancelar reserva
               </button>
             )}
             <button type="button" className="btn secondary" onClick={onClose}>

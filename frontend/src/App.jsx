@@ -8,10 +8,18 @@ import Reservations from './pages/Reservations.jsx';
 import Cabins from './pages/Cabins.jsx';
 import Companies from './pages/Companies.jsx';
 import BI from './pages/BI.jsx';
+import Users from './pages/Users.jsx';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function SuperAdminRoute({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'super_admin') return <Navigate to="/" replace />;
   return children;
 }
 
@@ -29,9 +37,25 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="reservas" element={<Reservations />} />
-        <Route path="cabinas" element={<Cabins />} />
+        <Route path="cabinas" element={<Cabins unitType="cabina" />} />
+        <Route path="cabanas" element={<Cabins unitType="cabana" />} />
         <Route path="empresas" element={<Companies />} />
-        <Route path="bi" element={<BI />} />
+        <Route
+          path="bi"
+          element={
+            <SuperAdminRoute>
+              <BI />
+            </SuperAdminRoute>
+          }
+        />
+        <Route
+          path="usuarios"
+          element={
+            <SuperAdminRoute>
+              <Users />
+            </SuperAdminRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

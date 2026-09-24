@@ -4,7 +4,13 @@ import { formatCurrency } from '../utils/format';
 
 const emptyForm = { name: '', description: '', capacity: 2, price_per_night: 0, price_per_night_company: 0 };
 
-export default function Cabins() {
+const LABELS = {
+  cabina: { title: 'Cabinas', singular: 'cabina', article: 'la' },
+  cabana: { title: 'Cabañas', singular: 'cabaña', article: 'la' },
+};
+
+export default function Cabins({ unitType }) {
+  const labels = LABELS[unitType] || LABELS.cabina;
   const [cabins, setCabins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -14,12 +20,13 @@ export default function Cabins() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitType]);
 
   async function load() {
     setLoading(true);
     try {
-      const { data } = await client.get('/cabins');
+      const { data } = await client.get('/cabins', { params: { unit_type: unitType } });
       setCabins(data);
     } finally {
       setLoading(false);
@@ -50,31 +57,32 @@ export default function Cabins() {
     e.preventDefault();
     setError('');
     try {
+      const payload = { ...form, unit_type: unitType };
       if (editing) {
-        await client.put(`/cabins/${editing.id}`, form);
+        await client.put(`/cabins/${editing.id}`, payload);
       } else {
-        await client.post('/cabins', form);
+        await client.post('/cabins', payload);
       }
       setShowModal(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al guardar la cabina');
+      setError(err.response?.data?.error || `Error al guardar la ${labels.singular}`);
     }
   }
 
   async function handleDelete(c) {
-    if (!confirm(`Eliminar/desactivar la cabina "${c.name}"?`)) return;
+    if (!confirm(`Eliminar/desactivar "${c.name}"?`)) return;
     await client.delete(`/cabins/${c.id}`);
     load();
   }
 
   return (
     <div>
-      <h1 className="page-title">Cabinas</h1>
-      <p className="page-subtitle">Administra las cabinas disponibles para reserva</p>
+      <h1 className="page-title">{labels.title}</h1>
+      <p className="page-subtitle">Administra las {labels.title.toLowerCase()} disponibles para reserva</p>
 
       <div className="toolbar">
-        <button className="btn" onClick={openCreate}>+ Agregar cabina</button>
+        <button className="btn" onClick={openCreate}>+ Agregar {labels.singular}</button>
       </div>
 
       <div className="card">
@@ -112,6 +120,13 @@ export default function Cabins() {
                   </td>
                 </tr>
               ))}
+              {cabins.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No hay {labels.title.toLowerCase()} registradas todavia
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -120,7 +135,7 @@ export default function Cabins() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing ? 'Editar cabina' : 'Nueva cabina'}</h2>
+            <h2>{editing ? `Editar ${labels.singular}` : `Nueva ${labels.singular}`}</h2>
             <form onSubmit={handleSubmit}>
               <div className="field">
                 <label>Nombre</label>
@@ -149,6 +164,8 @@ export default function Cabins() {
                     style={{ width: '100%' }}
                     value={form.capacity}
                     onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.target.select()}
                   />
                 </div>
                 <div className="field">
@@ -160,6 +177,8 @@ export default function Cabins() {
                     style={{ width: '100%' }}
                     value={form.price_per_night}
                     onChange={(e) => setForm({ ...form, price_per_night: Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.target.select()}
                   />
                 </div>
               </div>
@@ -173,6 +192,8 @@ export default function Cabins() {
                     style={{ width: '100%' }}
                     value={form.price_per_night_company}
                     onChange={(e) => setForm({ ...form, price_per_night_company: Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.target.select()}
                   />
                 </div>
               </div>

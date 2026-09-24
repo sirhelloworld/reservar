@@ -17,7 +17,7 @@ function formatMoney(value) {
   return `₡${formatted}`;
 }
 
-const PAYMENT_LABELS = { efectivo: 'Efectivo', sinpe: 'Sinpe', tarjeta: 'Tarjeta' };
+const PAYMENT_LABELS = { efectivo: 'Efectivo', sinpe: 'Sinpe', tarjeta: 'Tarjeta', transferencia: 'Transferencia' };
 
 function buildDailySummaryHtml(dateStr, reservations) {
   const rowsHtml = reservations
@@ -38,12 +38,12 @@ function buildDailySummaryHtml(dateStr, reservations) {
     )
     .join('');
 
-  const totals = { efectivo: 0, sinpe: 0, tarjeta: 0 };
+  const totals = { efectivo: 0, sinpe: 0, tarjeta: 0, transferencia: 0 };
   for (const r of reservations) {
     const key = totals[r.payment_method] !== undefined ? r.payment_method : 'efectivo';
     totals[key] += Number(r.total_price) || 0;
   }
-  const grandTotal = totals.efectivo + totals.sinpe + totals.tarjeta;
+  const grandTotal = totals.efectivo + totals.sinpe + totals.tarjeta + totals.transferencia;
 
   const totalsHtml = reservations.length === 0 ? '' : `
       <div style="padding:0 24px 20px;">
@@ -51,6 +51,7 @@ function buildDailySummaryHtml(dateStr, reservations) {
           <tr><td style="padding:4px 16px 4px 0;color:#64748b;">Efectivo</td><td style="text-align:right;font-weight:600;">${formatMoney(totals.efectivo)}</td></tr>
           <tr><td style="padding:4px 16px 4px 0;color:#64748b;">Sinpe</td><td style="text-align:right;font-weight:600;">${formatMoney(totals.sinpe)}</td></tr>
           <tr><td style="padding:4px 16px 4px 0;color:#64748b;">Tarjeta</td><td style="text-align:right;font-weight:600;">${formatMoney(totals.tarjeta)}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#64748b;">Transferencia</td><td style="text-align:right;font-weight:600;">${formatMoney(totals.transferencia)}</td></tr>
           <tr><td style="padding:8px 16px 0 0;color:#1e3a5f;font-weight:700;">Total general</td><td style="padding-top:8px;text-align:right;font-weight:700;color:#1e3a5f;">${formatMoney(grandTotal)}</td></tr>
         </table>
       </div>`;

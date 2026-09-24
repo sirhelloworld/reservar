@@ -7,6 +7,8 @@ const companiesRoutes = require('./routes/companies.routes');
 const reservationsRoutes = require('./routes/reservations.routes');
 const biRoutes = require('./routes/bi.routes');
 const systemRoutes = require('./routes/system.routes');
+const usersRoutes = require('./routes/users.routes');
+const cronRoutes = require('./routes/cron.routes');
 
 const app = express();
 
@@ -21,6 +23,8 @@ app.use('/api/companies', companiesRoutes);
 app.use('/api/reservations', reservationsRoutes);
 app.use('/api/bi', biRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/cron', cronRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 

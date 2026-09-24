@@ -4,8 +4,11 @@ CREATE TABLE IF NOT EXISTS admin_users (
   id SERIAL PRIMARY KEY,
   email VARCHAR(150) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'super_admin', -- super_admin | operador
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'super_admin';
 
 CREATE TABLE IF NOT EXISTS cabins (
   id SERIAL PRIMARY KEY,
@@ -14,11 +17,13 @@ CREATE TABLE IF NOT EXISTS cabins (
   capacity INTEGER NOT NULL DEFAULT 2,
   price_per_night NUMERIC(10,2) NOT NULL DEFAULT 0,
   price_per_night_company NUMERIC(10,2) NOT NULL DEFAULT 0,
+  unit_type VARCHAR(20) NOT NULL DEFAULT 'cabina', -- cabina | cabana
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE cabins ADD COLUMN IF NOT EXISTS price_per_night_company NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE cabins ADD COLUMN IF NOT EXISTS unit_type VARCHAR(20) NOT NULL DEFAULT 'cabina';
 
 CREATE TABLE IF NOT EXISTS companies (
   id SERIAL PRIMARY KEY,
@@ -89,3 +94,11 @@ DROP TRIGGER IF EXISTS trg_check_reservation_overlap ON reservations;
 CREATE TRIGGER trg_check_reservation_overlap
   BEFORE INSERT OR UPDATE ON reservations
   FOR EACH ROW EXECUTE FUNCTION check_reservation_overlap();
+
+-- Supabase expone el esquema public via su API REST (PostgREST). Se activa RLS
+-- sin politicas para bloquear ese acceso; el backend se conecta como el dueno
+-- de las tablas, por lo que no le afecta.
+ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cabins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
